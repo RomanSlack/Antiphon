@@ -1,9 +1,20 @@
 # Antiphon
 
-Urban active noise cancellation and an acoustics foundation model: an ML model
-that predicts sound propagation in urban geometries in real time. The ANC
-corridor installation is the proving ground; the foundation model API is the
-product.
+![Antiphon: physics, control, learned acoustics](docs/figures/banner.png)
+
+Urban active noise cancellation driven by a **learned acoustics model**: a
+neural network that predicts how sound propagates through street geometry
+(complex transfer functions, magnitude *and phase*) so the ANC controller no
+longer needs expensive per-site measurement campaigns. The ANC corridor
+installation is the proving ground; the acoustics foundation model API is
+the product.
+
+**Headline result (v1, simulation):** across 10 street geometries the model
+was never trained on, an FxLMS controller driven purely by model-predicted
+speaker-to-microphone paths achieves **90% of the noise cancellation** that
+exactly-measured paths achieve, reaching full (>= 20 dB) cancellation in 15
+of 20 cases and outright beating measured paths in several. The science:
+`docs/science.md`. The numbers: `docs/results.md`.
 
 Third Axis AI Consulting / 316 Group.
 
