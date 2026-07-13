@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Antiphon — walk the quiet street</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="wrap">
+  <header>
+    <h1>ANTIPHON</h1>
+    <span class="sub">walk through a physically simulated street &mdash; find the quiet</span>
+  </header>
+  <div id="stage">
+    <canvas id="view" width="1120" height="620"></canvas>
+    <div id="overlay">
+      <div id="startcard">
+        <h2>Walk the quiet street</h2>
+        <p>Real traffic noise propagated by a wave-equation simulation.
+           Walk with <b>WASD</b> / arrows. Toggle the noise-cancellation
+           system with <b>Space</b>. Head for the bench.</p>
+        <p class="hint">Headphones or bass-capable speakers recommended.</p>
+        <button id="startbtn">Enter the street</button>
+      </div>
+    </div>
+  </div>
+  <div id="hud">
+    <button id="ancbtn" class="off">ANC&nbsp;OFF</button>
+    <div id="meterwrap">
+      <div id="meterlabel">what you hear</div>
+      <div id="meterbg"><div id="meterbar"></div></div>
+      <div id="meterdb">&ndash;</div>
+    </div>
+    <label id="volwrap">volume
+      <input type="range" id="vol" min="0" max="100" value="60">
+    </label>
+  </div>
+  <footer>
+    FDTD wave simulation &middot; Wiener-optimal multichannel control &middot;
+    audio&nbsp;=&nbsp;simulated pressure at your position &middot;
+    <span id="credit"></span>
+  </footer>
+</div>
+<script src="game.js"></script>
+</body>
+</html>

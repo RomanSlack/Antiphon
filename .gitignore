@@ -17,3 +17,4 @@ data/
 .idea/
 *.swp
 .DS_Store
+web/game/assets/
