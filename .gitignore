@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+dist/
+build/
+
+# Generated data and training runs (large, reproducible from seeds)
+data/
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
