@@ -20,16 +20,18 @@ Third Axis AI Consulting / 316 Group.
   identification: 40+ dB tone reduction on FDTD-measured street-canyon paths.
 - **Synthetic data generator**: randomized street canyons to complex transfer
   functions H(f) at 64 frequencies (30-430 Hz), HDF5, fully seeded.
-- **Foundation model v1** (10.4M-param PyTorch: CNN geometry encoder +
-  cross-attention queries) with training pipeline, physics baselines, and a
-  validated sparse-H-to-FIR chain for plugging predictions into the
-  controller.
+- **Foundation model** (9.4M-param PyTorch: CNN geometry encoder +
+  cross-attention queries) trained on 12,000 synthetic scenes; beats
+  physics and statistical baselines by 2.4x on unseen geometries.
+- **Closed loop proven**: FxLMS driven by model-predicted secondary paths
+  achieves 90% of measured-path cancellation (capped metric) across 10
+  held-out scenes, beating measured paths outright in several. Full
+  numbers: `docs/results.md`.
 - **Fast analytical solver** (Green's functions + image sources) for
   interactive demos, refactored from the original prototype.
 
-**Current state:** see `docs/STATUS.md`. Next up: generate the full training
-set, train v1, and run the closed-loop evaluation (model-predicted secondary
-paths driving FxLMS vs measured paths, target >= 80% of the dB reduction).
+**Current state:** v1 pipeline complete; all success criteria met. See
+`docs/results.md` for the full evaluation and `docs/STATUS.md` for history.
 
 ## Layout
 
@@ -81,7 +83,8 @@ See `refs/URBAN_ANC_HANDOFF.md` for the full engineering plan and
 2. ~~2D FDTD wave solver (Yee grid, PML boundaries)~~ (done, validated)
 3. ~~Material absorption + broadband noise sources~~ (done)
 4. ~~Multi-channel FxLMS controller~~ (done)
-5. Synthetic training data generation (generator done; full run pending)
-6. Foundation model v1 training (code done; run pending)
-7. Closed-loop evaluation: model-predicted secondary paths in FxLMS
-8. Results report + figures, then web demo / investor materials
+5. ~~Synthetic training data generation~~ (done: 12k scenes / 288k samples)
+6. ~~Foundation model training~~ (done: v2, val MSE 0.755 vs 1.85 baseline)
+7. ~~Closed-loop evaluation~~ (done: 90% of measured-path performance)
+8. ~~Results report + figures~~ (done: docs/results.md)
+9. Next: broadband closed loop, 3D, web demo / investor materials
