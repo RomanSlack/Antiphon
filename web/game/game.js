@@ -33,7 +33,7 @@ const G = {
   lowGain: null, highGain: null, gOff: null, gOn: null,
   slots: { off: [], on: [] },
   cellCache: new Map(),
-  anc: false, fieldAlpha: 0,
+  anc: false, fieldAlpha: 0, canopy: false, canopyAlpha: 0,
   px: 4.0, py: 1.0, trail: [],
   keys: {}, cell: -1, started: false,
 };
@@ -82,8 +82,23 @@ function cellBuffers(idx) {
 }
 
 // ---------- audio graph ----------
+function showError(msg) {
+  const card = document.getElementById('startcard');
+  card.innerHTML = '<h2>Audio error</h2><p style="color:#f85149">' + msg +
+    '</p><p>Open the devtools console for details.</p>';
+  document.getElementById('overlay').classList.remove('hidden');
+}
+
 function startAudio() {
-  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  // Context at the asset rate: convolver buffers match natively
+  let ctx;
+  try {
+    ctx = new (window.AudioContext || window.webkitAudioContext)(
+      { sampleRate: G.meta.fs });
+  } catch (e) {
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (ctx.state === 'suspended') ctx.resume();
   G.ctx = ctx;
 
   const noiseBuf = ctx.createBuffer(1, G.noiseF32.length, G.meta.fs);
@@ -105,22 +120,47 @@ function startAudio() {
   G.highGain = ctx.createGain();
   G.highGain.gain.value = 0;
 
+  // Passive absorptive canopy: attenuation rising with frequency
+  // (~3 dB @ 500 Hz to ~15 dB @ 4 kHz, typical absorptive screen)
+  G.gHDry = ctx.createGain();
+  G.gHCan = ctx.createGain();
+  G.gHDry.gain.value = 1;
+  G.gHCan.gain.value = 0;
+  const shelf1 = ctx.createBiquadFilter();
+  shelf1.type = 'highshelf';
+  shelf1.frequency.value = 600;
+  shelf1.gain.value = -8;
+  const shelf2 = ctx.createBiquadFilter();
+  shelf2.type = 'highshelf';
+  shelf2.frequency.value = 1800;
+  shelf2.gain.value = -7;
+  G.highGain.connect(G.gHDry);
+  G.highGain.connect(shelf1);
+  shelf1.connect(shelf2);
+  shelf2.connect(G.gHCan);
+
   G.master = ctx.createGain();
   G.master.gain.value = 0.4 * ($('vol').value / 60);
   G.analyser = ctx.createAnalyser();
   G.analyser.fftSize = 2048;
   G.lowGain.connect(G.master);
-  G.highGain.connect(G.master);
+  G.gHDry.connect(G.master);
+  G.gHCan.connect(G.master);
   G.master.connect(G.analyser);
   G.analyser.connect(ctx.destination);
 
-  ctx.decodeAudioData(G.highsArr.slice(0)).then((buf) => {
+  ctx.decodeAudioData(G.highsArr.slice(0)).catch((e) => {
+    console.error('highs decode failed', e);
+    return null;
+  }).then((buf) => {
+    if (!buf) return;
     const src = ctx.createBufferSource();
     src.buffer = buf;
     src.loop = true;
     src.connect(G.highGain);
     src.start();
   });
+  console.log('audio started: ctx rate', ctx.sampleRate);
 
   G.noiseSrc.start();
   switchCell(cellIndex(G.px, G.py), true);
@@ -185,6 +225,19 @@ function setAnc(on) {
   $('meterbar').className = on ? 'on' : '';
 }
 
+function setCanopy(on) {
+  G.canopy = on;
+  const t = G.ctx.currentTime;
+  for (const [g, v] of [[G.gHDry, on ? 0 : 1], [G.gHCan, on ? 1 : 0]]) {
+    g.gain.cancelScheduledValues(t);
+    g.gain.setValueAtTime(g.gain.value, t);
+    g.gain.linearRampToValueAtTime(v, t + 0.4);
+  }
+  const btn = $('canbtn');
+  btn.className = on ? 'on' : 'off';
+  btn.innerHTML = on ? 'CANOPY&nbsp;ON' : 'CANOPY&nbsp;OFF';
+}
+
 // ---------- world / rendering ----------
 const SPEED = 2.2; // m/s
 
@@ -214,6 +267,7 @@ function step(dt) {
     }
   }
   G.fieldAlpha += ((G.anc ? 1 : 0) - G.fieldAlpha) * Math.min(1, dt * 3);
+  G.canopyAlpha += ((G.canopy ? 1 : 0) - G.canopyAlpha) * Math.min(1, dt * 3);
 }
 
 function world2px(cv, x, y) {
@@ -260,6 +314,21 @@ function draw() {
   c.fillStyle = '#a5d6ff';
   c.fillRect(bx - 6, by - 6, 12, 12);
   label(c, 'quiet-zone bench', bx - 55, by + 24);
+
+  // absorptive canopy strips along both facades
+  if (G.canopyAlpha > 0.02) {
+    const hw = m.street_halfwidth;
+    for (const sgn of [1, -1]) {
+      const [ax, ay] = world2px(cv, 1.6, sgn * hw);
+      const [bx2, by2] = world2px(cv, m.domain[0] - 1.6, sgn * (hw - 1.1));
+      c.fillStyle = `rgba(87, 171, 90, ${0.30 * G.canopyAlpha})`;
+      c.fillRect(Math.min(ax, bx2), Math.min(ay, by2),
+                 Math.abs(bx2 - ax), Math.abs(by2 - ay));
+    }
+    c.globalAlpha = G.canopyAlpha;
+    label(c, 'absorptive canopy (passive)', cv.width / 2 - 100, 36);
+    c.globalAlpha = 1;
+  }
 
   // trail + walker
   c.strokeStyle = 'rgba(230,237,243,0.35)';
@@ -321,9 +390,11 @@ let last = 0;
 function loop(t) {
   const dt = Math.min(0.05, (t - last) / 1000 || 0.016);
   last = t;
-  step(dt);
-  draw();
-  meter();
+  if (G.meta) {
+    step(dt);
+    draw();
+    meter();
+  }
   requestAnimationFrame(loop);
 }
 
@@ -331,6 +402,10 @@ window.addEventListener('keydown', (e) => {
   if (e.key === ' ') {
     e.preventDefault();
     if (G.started) setAnc(!G.anc);
+    return;
+  }
+  if (e.key === 'c' || e.key === 'C') {
+    if (G.started) setCanopy(!G.canopy);
     return;
   }
   G.keys[e.key.toLowerCase()] = true;
@@ -342,16 +417,30 @@ window.addEventListener('keyup', (e) => {
 });
 
 $('ancbtn').addEventListener('click', () => G.started && setAnc(!G.anc));
+$('canbtn').addEventListener('click', () => G.started && setCanopy(!G.canopy));
 $('vol').addEventListener('input', () => {
   if (G.master) G.master.gain.value = 0.4 * ($('vol').value / 60);
 });
 $('startbtn').addEventListener('click', () => {
-  $('overlay').classList.add('hidden');
-  startAudio();
-  G.started = true;
+  if (!G.loaded) return;
+  try {
+    startAudio();
+    G.started = true;
+    $('overlay').classList.add('hidden');
+  } catch (e) {
+    console.error(e);
+    showError(String(e));
+  }
 });
 
+$('startbtn').disabled = true;
+$('startbtn').textContent = 'loading assets\u2026';
 loadAssets().then(() => {
+  G.loaded = true;
   $('startbtn').disabled = false;
-  requestAnimationFrame(loop);
+  $('startbtn').textContent = 'Enter the street';
+}).catch((e) => {
+  console.error(e);
+  showError('asset load failed: ' + String(e));
 });
+requestAnimationFrame(loop);

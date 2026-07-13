@@ -172,6 +172,19 @@ def main():
     x12, low_std, low_sim_std, highs_scale = bake_audio()
     pts, h_off, h_on = bake_irs()
 
+    # Loudness calibration: scale the convolver output so the ANC-off ear
+    # signal at the spawn point matches the real recording's low band.
+    # (The naive std(low)/std(x) is wrong: it ignores the IR's own gain.)
+    spawn = (4.0, 1.0)
+    si = min(range(len(pts)),
+             key=lambda i: (pts[i][0] - spawn[0]) ** 2
+             + (pts[i][1] - spawn[1]) ** 2)
+    p_ref = fftconvolve(x12.astype(np.float64),
+                        h_off[si].astype(np.float64))[:len(x12)]
+    low_calibration = low_std / (float(np.std(p_ref)) + 1e-12)
+    print(f'calibration: ear-signal std {np.std(p_ref):.4g}, '
+          f'recording low std {low_std:.4g} -> gain {low_calibration:.3g}')
+
     # Interleave per point: [h_off, h_on] so lookup is one contiguous read
     n_pts, L = h_off.shape
     irs = np.stack([h_off, h_on], axis=1)  # (n_pts, 2, L)
@@ -192,7 +205,7 @@ def main():
         'speakers': [list(p) for p in SPEAKERS],
         'mics': [list(p) for p in ERROR_MICS],
         'bench': list(BENCH),
-        'low_calibration': low_std / low_sim_std,
+        'low_calibration': low_calibration,
         'low_boost': 1.6,
         'highs_scale': highs_scale,
         'walk_bounds': [2.6, 21.4, -6.2, 6.2],
